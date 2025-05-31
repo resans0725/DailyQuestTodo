@@ -112,7 +112,7 @@ struct HomeView: View {
                                 // マイルストーン（無限に生成）
                                 ForEach(1..<maxLevelToShow(), id: \.self) { level in
                                     if level % 5 == 0 {
-                                        Image(systemName: level % 10 == 0 ? "flame.fill" : "star.fill")
+                                        Image(systemName: level % 10 == 0 ? "flame.fill" : "circle.fill")
                                             .foregroundColor(level % 10 == 0 ? .red : .yellow)
                                             .font(.system(size: 20))
                                             .offset(x: milestonePosition(level: level), y: -30)
@@ -203,13 +203,6 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("ホーム")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("ホーム")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(.green)
-                }
-            }
         }
         .onAppear {
             animateLevel = true

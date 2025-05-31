@@ -69,6 +69,7 @@ class QuestViewModel: ObservableObject {
     func setDailyQuest(_ quest: Quest) {
         if dailyQuests.count < 3 {
             quest.isDaily = true
+            quest.createdAt = Date() // デイリー設定時に日付を更新
             do {
                 try modelContext.save()
                 try fetchQuests()
@@ -79,6 +80,10 @@ class QuestViewModel: ObservableObject {
     }
 
     func removeDailyQuest(_ quest: Quest) {
+        // 未達成なら失敗カウントを増やす
+        if !quest.isCompleted {
+            quest.failCount += 1
+        }
         quest.isDaily = false
         do {
             try modelContext.save()
@@ -94,7 +99,7 @@ class QuestViewModel: ObservableObject {
         if currentExp >= expToNextLevel {
             level += 1
             currentExp -= expToNextLevel
-            expToNextLevel += 50
+            expToNextLevel = calculateExpToNextLevel()
             showLevelUp = true
         }
         do {
@@ -128,15 +133,29 @@ class QuestViewModel: ObservableObject {
     func checkDailyReset() {
         let calendar = Calendar.current
         let now = Date()
-        if calendar.component(.day, from: now) != calendar.component(.day, from: quests.first?.createdAt ?? now) {
-            dailyQuests.forEach { $0.isDaily = false }
-            do {
-                try modelContext.save()
-                try fetchQuests()
-            } catch {
-                print("デイリーリセット時のエラー: \(error.localizedDescription)")
+
+        for quest in dailyQuests {
+            let isSameDay = calendar.isDate(quest.createdAt, inSameDayAs: now)
+            if !isSameDay {
+                // 期限切れの場合
+                if !quest.isCompleted {
+                    quest.failCount += 1 // 未達成なら失敗カウントを増やす
+                }
+                quest.isDaily = false
             }
         }
+
+        do {
+            try modelContext.save()
+            try fetchQuests()
+        } catch {
+            print("デイリーリセット時のエラー: \(error.localizedDescription)")
+        }
+    }
+
+    func calculateExpToNextLevel() -> Int {
+        // レベルに応じて必要なEXPを動的に計算
+        return 100 + (level * 50) // 例: レベル1→100EXP, レベル2→150EXP, レベル3→200EXP...
     }
 
     func totalCompletedQuests() -> Int {

@@ -104,9 +104,9 @@ struct QuestCardView<Content: View>: View {
     private var difficultyIcon: String {
         switch quest.difficulty {
         case "easy":
-            return "star.fill"
+            return "circle.fill"
         case "normal":
-            return "dash.diamond.fill"
+            return "diamond.fill"
         case "hard":
             return "exclamationmark.triangle.fill"
         default:
