@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct HomeView: View {
     @ObservedObject var viewModel: QuestViewModel
     @State private var animateLevel = false
@@ -16,6 +14,9 @@ struct HomeView: View {
     @State private var animateMissions = false
     @State private var showLevelUpEffect = false
     @State private var animateEmptyView = false
+    @State private var characterPosition: CGFloat = 0
+    @State private var backgroundOffset: CGFloat = 0
+    @State private var characterJump = false
 
     var body: some View {
         NavigationView {
@@ -38,6 +39,7 @@ struct HomeView: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
+                        // レベル表示とゲージ
                         VStack(spacing: 10) {
                             Text("レベル \(viewModel.level)")
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -50,7 +52,6 @@ struct HomeView: View {
                                 .cornerRadius(15)
                                 .shadow(radius: 5)
                                 .scaleEffect(animateLevel ? 1.0 : 0.8)
-                                .rotation3DEffect(.degrees(animateLevel ? 0 : 360), axis: (x: 0, y: 1, z: 0))
                                 .opacity(animateLevel ? 1 : 0)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.2), value: animateLevel)
 
@@ -74,9 +75,85 @@ struct HomeView: View {
                         }
                         .padding(.top)
 
+                        // 冒険の旅セクション
+                        SectionView(title: "冒険の旅") {
+                            ZStack(alignment: .bottomLeading) {
+                                // 背景（スクロールする）
+                                ZStack {
+                                    Rectangle()
+                                        .fill(LinearGradient(gradient: Gradient(colors: [.green.opacity(0.5), .blue.opacity(0.3)]), startPoint: .top, endPoint: .bottom))
+                                        .frame(height: 120)
+                                    ForEach(0..<5) { i in
+                                        Image(systemName: "leaf.fill")
+                                            .foregroundColor(.green.opacity(0.7))
+                                            .font(.system(size: 20))
+                                            .offset(x: CGFloat(i) * 80 + backgroundOffset, y: -40)
+                                    }
+                                    ForEach(0..<3) { i in
+                                        Image(systemName: "mountain.2.fill")
+                                            .foregroundColor(.gray.opacity(0.7))
+                                            .font(.system(size: 30))
+                                            .offset(x: CGFloat(i) * 150 + backgroundOffset + 100, y: -30)
+                                    }
+                                }
+                                .frame(height: 120)
+                                .clipped()
+                                .animation(.linear(duration: 2), value: backgroundOffset)
+
+                                // 道
+                                Rectangle()
+                                    .fill(Color.brown.opacity(0.5))
+                                    .frame(height: 20)
+
+                                // マイルストーン
+                                ForEach(1..<20) { level in
+                                    if level % 5 == 0 {
+                                        Image(systemName: level % 10 == 0 ? "flame.fill" : "star.fill")
+                                            .foregroundColor(level % 10 == 0 ? .red : .yellow)
+                                            .font(.system(size: 20))
+                                            .offset(x: milestonePosition(level: level), y: -30)
+                                            .overlay(
+                                                Group {
+                                                    if characterPosition >= milestonePosition(level: level) - 10 && characterPosition <= milestonePosition(level: level) + 10 {
+                                                        ForEach(0..<5) { _ in
+                                                            Image(systemName: "sparkle")
+                                                                .foregroundColor(.yellow)
+                                                                .font(.system(size: 10))
+                                                                .offset(x: CGFloat.random(in: -10...10), y: CGFloat.random(in: -10...10))
+                                                                .opacity(characterJump ? 1 : 0)
+                                                                .animation(.easeInOut(duration: 1).repeatCount(3, autoreverses: true), value: characterJump)
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                    }
+                                }
+
+                                // 棒人間
+                                VStack {
+                                    Image(systemName: "figure.walk")
+                                        .foregroundColor(.black)
+                                        .font(.system(size: 30))
+                                        .scaleEffect(characterJump ? 1.2 : 1.0)
+                                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: characterJump)
+                                    Circle()
+                                        .fill(Color.black)
+                                        .frame(width: 10, height: 10)
+                                        .offset(y: -10)
+                                }
+                                .offset(x: min(characterPosition, UIScreen.main.bounds.width - 100)) // 画面外に出ないように制限
+                                .animation(.easeInOut(duration: 1), value: characterPosition)
+                            }
+                            .frame(height: 120)
+                            .background(Color.white.opacity(0.9))
+                            .cornerRadius(15)
+                            .shadow(radius: 5)
+                            .padding(.horizontal)
+                        }
+
+                        // 今日のデイリーミッション
                         SectionView(title: "今日のデイリーミッション (\(viewModel.dailyQuests.count)/3)") {
                             if viewModel.dailyQuests.isEmpty {
-                                // エンプティービュー
                                 VStack(spacing: 15) {
                                     Image(systemName: "exclamationmark.circle.fill")
                                         .font(.system(size: 50))
@@ -103,7 +180,6 @@ struct HomeView: View {
                                 .opacity(animateEmptyView ? 1 : 0)
                                 .offset(y: animateEmptyView ? 0 : 20)
                                 .animation(.easeInOut(duration: 0.5).delay(0.6), value: animateEmptyView)
-                                .padding(.top)
                             } else {
                                 ForEach(viewModel.dailyQuests.indices, id: \.self) { index in
                                     let quest = viewModel.dailyQuests[index]
@@ -123,19 +199,17 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("ホーム")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("ホーム")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(.green)
-                }
-            }
         }
         .onAppear {
             animateLevel = true
             animateGauge = true
             animateMissions = true
             animateEmptyView = true
+            updateAdventureProgress()
+        }
+        .onChange(of: viewModel.level) { newLevel in
+            updateAdventureProgress()
+            characterJump = true
         }
         .onChange(of: viewModel.showLevelUp) { newValue in
             if newValue {
@@ -151,5 +225,15 @@ struct HomeView: View {
     private var gaugeWidth: CGFloat {
         let progress = CGFloat(viewModel.currentExp) / CGFloat(viewModel.expToNextLevel)
         return min(max(progress * (UIScreen.main.bounds.width - 40), 0), UIScreen.main.bounds.width - 40)
+    }
+
+    private func milestonePosition(level: Int) -> CGFloat {
+        return CGFloat(level) * 50
+    }
+
+    private func updateAdventureProgress() {
+        let maxPosition = UIScreen.main.bounds.width - 100
+        characterPosition = min(CGFloat(viewModel.level) * 50, maxPosition)
+        backgroundOffset = -characterPosition / 2 // 背景のスクロール速度を調整
     }
 }
