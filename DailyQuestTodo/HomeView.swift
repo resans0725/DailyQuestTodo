@@ -17,6 +17,15 @@ struct HomeView: View {
     @State private var characterPosition: CGFloat = 0
     @State private var backgroundOffset: CGFloat = 0
     @State private var characterJump = false
+    @State private var currentStage = 0 // 現在のステージ（0: 森, 1: 山, 2: 海, 3: 城）TODO: UserDefaultsで保存
+    @State private var stageTransition = false // ステージ遷移時のエフェクト
+
+    private let stages = [
+        (name: "森", background: Gradient(colors: [.green.opacity(0.5), .blue.opacity(0.3)]), icon: "leaf.fill", iconColor: Color.green.opacity(0.7)),
+        (name: "山", background: Gradient(colors: [.gray.opacity(0.5), .blue.opacity(0.3)]), icon: "mountain.2.fill", iconColor: Color.gray.opacity(0.7)),
+        (name: "海", background: Gradient(colors: [.blue.opacity(0.5), .cyan.opacity(0.3)]), icon: "drop.fill", iconColor: Color.blue.opacity(0.7)),
+        (name: "城", background: Gradient(colors: [.purple.opacity(0.5), .gray.opacity(0.3)]), icon: "building.2.fill", iconColor: Color.purple.opacity(0.7))
+    ]
 
     var body: some View {
         NavigationView {
@@ -76,37 +85,32 @@ struct HomeView: View {
                         .padding(.top)
 
                         // 冒険の旅セクション
-                        SectionView(title: "冒険の旅") {
+                        SectionView(title: "冒険の旅 - ステージ: \(stages[currentStage].name)") {
                             ZStack(alignment: .bottomLeading) {
-                                // 背景（スクロールする）
+                                // 背景（ステージごとの変化）
                                 ZStack {
                                     Rectangle()
-                                        .fill(LinearGradient(gradient: Gradient(colors: [.green.opacity(0.5), .blue.opacity(0.3)]), startPoint: .top, endPoint: .bottom))
+                                        .fill(LinearGradient(gradient: stages[currentStage].background, startPoint: .top, endPoint: .bottom))
                                         .frame(height: 120)
                                     ForEach(0..<5) { i in
-                                        Image(systemName: "leaf.fill")
-                                            .foregroundColor(.green.opacity(0.7))
+                                        Image(systemName: stages[currentStage].icon)
+                                            .foregroundColor(stages[currentStage].iconColor)
                                             .font(.system(size: 20))
                                             .offset(x: CGFloat(i) * 80 + backgroundOffset, y: -40)
-                                    }
-                                    ForEach(0..<3) { i in
-                                        Image(systemName: "mountain.2.fill")
-                                            .foregroundColor(.gray.opacity(0.7))
-                                            .font(.system(size: 30))
-                                            .offset(x: CGFloat(i) * 150 + backgroundOffset + 100, y: -30)
                                     }
                                 }
                                 .frame(height: 120)
                                 .clipped()
-                                .animation(.linear(duration: 2), value: backgroundOffset)
+                                .opacity(stageTransition ? 0 : 1)
+                                .animation(.easeInOut(duration: 0.5), value: stageTransition)
 
                                 // 道
                                 Rectangle()
                                     .fill(Color.brown.opacity(0.5))
                                     .frame(height: 20)
 
-                                // マイルストーン
-                                ForEach(1..<20) { level in
+                                // マイルストーン（無限に生成）
+                                ForEach(1..<maxLevelToShow(), id: \.self) { level in
                                     if level % 5 == 0 {
                                         Image(systemName: level % 10 == 0 ? "flame.fill" : "star.fill")
                                             .foregroundColor(level % 10 == 0 ? .red : .yellow)
@@ -141,7 +145,7 @@ struct HomeView: View {
                                         .frame(width: 10, height: 10)
                                         .offset(y: -10)
                                 }
-                                .offset(x: min(characterPosition, UIScreen.main.bounds.width - 100)) // 画面外に出ないように制限
+                                .offset(x: characterPosition + 50)
                                 .animation(.easeInOut(duration: 1), value: characterPosition)
                             }
                             .frame(height: 120)
@@ -199,6 +203,13 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("ホーム")
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("ホーム")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.green)
+                }
+            }
         }
         .onAppear {
             animateLevel = true
@@ -228,12 +239,31 @@ struct HomeView: View {
     }
 
     private func milestonePosition(level: Int) -> CGFloat {
-        return CGFloat(level) * 50
+        let cycleLength = UIScreen.main.bounds.width - 100
+        return CGFloat(level * 50) - (CGFloat(currentStage) * cycleLength)
+    }
+
+    private func maxLevelToShow() -> Int {
+        return viewModel.level + 10 // 現在のレベルより10先まで表示
     }
 
     private func updateAdventureProgress() {
-        let maxPosition = UIScreen.main.bounds.width - 100
-        characterPosition = min(CGFloat(viewModel.level) * 50, maxPosition)
-        backgroundOffset = -characterPosition / 2 // 背景のスクロール速度を調整
+        let cycleLength = UIScreen.main.bounds.width - 100
+        let rawPosition = CGFloat(viewModel.level) * 50
+        let cycleCount = Int(rawPosition / cycleLength)
+        characterPosition = rawPosition.truncatingRemainder(dividingBy: cycleLength)
+
+        // ステージの更新
+        let newStage = cycleCount % stages.count
+        if newStage != currentStage {
+            stageTransition = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                stageTransition = false
+            }
+        }
+        currentStage = newStage
+
+        // 背景のスクロール（ステージごとにリセット）
+        backgroundOffset = -(characterPosition / 2)
     }
 }
